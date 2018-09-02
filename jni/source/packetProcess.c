@@ -93,7 +93,7 @@ void *packetProcessing(void * arg)
 			print_count_wcdma();
 #endif
 			printf("\nExiting Processing thread \n");
-			return;
+			return NULL;
 		}
 		
 		/* If enable GPRS than state is GSM than fetch stats from GSM */
@@ -139,6 +139,8 @@ void *packetProcessing(void * arg)
 			watchDogCount=0;
 		}
 	}
+	
+	return NULL;
 }
 
 /*

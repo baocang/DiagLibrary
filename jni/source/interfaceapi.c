@@ -109,7 +109,7 @@ void *cdma_cmd_thread()
 		if (!init_done)
 		{
 			d_log("Exiting request thread \n");
-			return ;
+			return NULL;
 		}
 		//print_lte_phy_status();
 		//decode_get_state_info();
@@ -120,6 +120,8 @@ void *cdma_cmd_thread()
 		sleep(1);
 
 	}
+	
+	return NULL;
 }
 
 /*Function to init the DM */
@@ -228,15 +230,19 @@ init_diag_port (unsigned int manufacture, unsigned int type,
 	printf("Calling the Setting logging %d",type);
 	set_logging_mask(type ,0);
 	
-	if (type == GSM) {
-		memset(&myCellInfo,0,sizeof(mGSMCellInfo));
-	} else if (type == WCDMA) {
-		memset(&myCellInfo,0,sizeof(myCellInfo));
-	} else if (type == LTE) {
+	// if (type == GSM) {
+	// printf("Calling the Setting logging GSM\n");
+	// 	memset(&myCellInfo,0,sizeof(mGSMCellInfo));
+	// } else if (type == WCDMA) {
+	// printf("Calling the Setting logging WCDMA\n");
+	// 	memset(&myCellInfo,0,sizeof(myCellInfo));
+	// } else if (type == LTE) {
+	printf("Calling the Setting logging LTE\n");
 		memset(&mLTE_CellInfo,0,sizeof(mLTE_CellInfo));
-	}else if (type == CDMA){
-		memset(&mkpi_cdma,0,sizeof(mkpi_cdma));
-	}
+	// }else if (type == CDMA){
+	// printf("Calling the Setting logging CDMA\n");
+	// 	memset(&mkpi_cdma,0,sizeof(mkpi_cdma));
+	// }
 	return returnType;
 
 }
@@ -977,4 +983,3 @@ void main(){
 
 }
 #endif
-

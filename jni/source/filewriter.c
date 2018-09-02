@@ -242,7 +242,7 @@ int  buffer_to_file_write(char *timebuff,int timelength,u_int16_t command_code,c
 	outerCmd = convert_into_external_code(command_code);
 	if(outerCmd == 0){
 	/* No need to write this command in file */
-		return ;
+		return -1;
 	}
 	if(g_fileWriteStatus){
 	  /* lock the mutex */
@@ -292,6 +292,8 @@ int  buffer_to_file_write(char *timebuff,int timelength,u_int16_t command_code,c
 	  pthread_mutex_unlock(&fileReleaseMutex);
   }
 	d_warning("\n End of Function: buffer_to_file_write");
+
+	return 0;
 }
 
 
@@ -481,4 +483,3 @@ void main ()
 			120,121,100);
 }
 #endif
-

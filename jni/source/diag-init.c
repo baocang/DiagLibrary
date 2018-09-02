@@ -20,6 +20,8 @@ extern int gManufactureType;
 extern int globalFD;
 extern int init_done;
 
+#define LOGD printf
+
 void *diag_com_listen(void *arg);
 extern void exit();
 
@@ -46,16 +48,225 @@ extern void exit();
 /*function to config ioctl on  device*/
 int diag_com_ioctl(int fd)
 {
-	int ioctl_status;
-	if(gManufactureType == SAMSUNG){
-		printf("Ashish initdiag: diag init for 4.4.2");
-		ioctl_status = ioctl(fd,7,0x20);
-	} else  ioctl_status = ioctl(fd,7,2);
-	if (ioctl_status == -1)
-	{
-		d_warning("diag_com_ioctl : Error in IOCTL logging , Errno = %d ",errno);
+	
+	int ret;
+
+
+	/*
+     * EXPERIMENTAL (NEXUS 6 ONLY): 
+     * 1. check remote_dev
+     * 2. Register a DCI client
+     * 3. Send DCI control command
+     */
+    ret = ioctl(fd, DIAG_IOCTL_REMOTE_DEV, (char *) &remote_dev); 
+    if (ret < 0){
+	        printf("ioctl DIAG_IOCTL_REMOTE_DEV fails, with ret val = %d\n", ret);
+	    	perror("ioctl DIAG_IOCTL_REMOTE_DEV");
+	} 
+	else{
+		LOGD("DIAG_IOCTL_REMOTE_DEV remote_dev=%d\n",remote_dev);
 	}
-	return ioctl_status;
+
+	// Register a DCI client
+	struct diag_dci_reg_tbl_t dci_client;
+	dci_client.client_id = 0;
+	dci_client.notification_list = 0;
+	dci_client.signal_type = SIGPIPE;
+	// dci_client.token = remote_dev;
+	dci_client.token = 0;
+	ret = ioctl(fd, DIAG_IOCTL_DCI_REG, (char *) &dci_client); 
+    if (ret < 0){
+	        printf("ioctl DIAG_IOCTL_DCI_REG fails, with ret val = %d\n", ret);
+	    	perror("ioctl DIAG_IOCTL_DCI_REG");
+	} 
+	else{
+		client_id = ret;
+		printf("DIAG_IOCTL_DCI_REG client_id=%d\n", client_id);
+	}
+
+	// Nexus-6-only logging optimizations
+	unsigned int b_optimize = 1;
+	ret = ioctl(fd, DIAG_IOCTL_OPTIMIZED_LOGGING, (char *) &b_optimize); 
+	if (ret < 0){
+	        printf("ioctl DIAG_IOCTL_OPTIMIZED_LOGGING fails, with ret val = %d\n", ret);
+	    	perror("ioctl DIAG_IOCTL_OPTIMIZED_LOGGING");
+	} 
+	// ret = ioctl(fd, DIAG_IOCTL_OPTIMIZED_LOGGING_FLUSH, NULL); 
+	// if (ret < 0){
+	//         printf("ioctl DIAG_IOCTL_OPTIMIZED_LOGGING_FLUSH fails, with ret val = %d\n", ret);
+	//     	perror("ioctl DIAG_IOCTL_OPTIMIZED_LOGGING_FLUSH");
+	// } 
+
+
+	/*
+     * TODO: cleanup the diag before start
+     * 1. Drain the buffer: prevent outdate logs next time
+     * 2. Clean up masks: prevent enable_log bug next time
+     */
+
+	/*
+	 * DIAG_IOCTL_LSM_DEINIT, try if it can clear buffer
+	 */
+
+	/*
+	ret = ioctl(fd, DIAG_IOCTL_LSM_DEINIT, NULL);
+	if (ret < 0){
+        printf("ioctl DIAG_IOCTL_LSM_DEINIT fails, with ret val = %d\n", ret);
+    	perror("ioctl DIAG_IOCTL_LSM_DEINIT");
+    }
+    */
+
+    // ret = ioctl(fd, DIAG_IOCTL_DCI_CLEAR_LOGS, (char *) &client_id);  
+    // if (ret < 0){
+    //     printf("ioctl DIAG_IOCTL_DCI_CLEAR_LOGS fails, with ret val = %d\n", ret);
+    // 	perror("ioctl DIAG_IOCTL_DCI_CLEAR_LOGS");
+    // }
+    // ret = ioctl(fd, DIAG_IOCTL_DCI_CLEAR_EVENTS, (char *) &client_id);  
+    // if (ret < 0){
+    //     printf("ioctl DIAG_IOCTL_DCI_CLEAR_EVENTS fails, with ret val = %d\n", ret);
+    // 	perror("ioctl DIAG_IOCTL_DCI_CLEAR_EVENTS");
+    // }
+
+    /*
+     * EXPERIMENTAL (NEXUS 6 ONLY): configure the buffering mode to circular
+     */
+    struct diag_buffering_mode_t buffering_mode;
+    // buffering_mode.peripheral = remote_dev;
+    buffering_mode.peripheral = 0;
+    buffering_mode.mode = DIAG_BUFFERING_MODE_STREAMING;
+    buffering_mode.high_wm_val = DEFAULT_HIGH_WM_VAL;
+    buffering_mode.low_wm_val = DEFAULT_LOW_WM_VAL;
+
+    ret = ioctl(fd, DIAG_IOCTL_PERIPHERAL_BUF_CONFIG, (char *) &buffering_mode);  
+    if (ret < 0){
+        printf("ioctl DIAG_IOCTL_PERIPHERAL_BUF_CONFIG fails, with ret val = %d\n", ret);
+    	perror("ioctl DIAG_IOCTL_PERIPHERAL_BUF_CONFIG");
+    }
+    // uint8_t peripheral = 0;
+    // for(;peripheral<=LAST_PERIPHERAL; peripheral++)
+    // {
+    // 	ret = ioctl(fd, DIAG_IOCTL_PERIPHERAL_BUF_DRAIN, (char *) &peripheral);  
+	   //  if (ret < 0){
+	   //      printf("ioctl DIAG_IOCTL_PERIPHERAL_BUF_DRAIN fails, with ret val = %d\n", ret);
+	   //  	perror("ioctl DIAG_IOCTL_PERIPHERAL_BUF_DRAIN");
+	   //  }
+
+	   //  /*
+	   //   * EXPERIMENTAL (NEXUS 6 ONLY): configure the buffering mode to circular
+	   //   */
+	   //  struct diag_buffering_mode_t buffering_mode;
+	   //  buffering_mode.peripheral = peripheral;
+	   //  buffering_mode.mode = DIAG_BUFFERING_MODE_STREAMING;
+	   //  buffering_mode.high_wm_val = DEFAULT_HIGH_WM_VAL;
+	   //  buffering_mode.low_wm_val = DEFAULT_LOW_WM_VAL;
+
+	   //  ret = ioctl(fd, DIAG_IOCTL_PERIPHERAL_BUF_CONFIG, (char *) &buffering_mode);  
+	   //  if (ret < 0){
+	   //      printf("ioctl DIAG_IOCTL_PERIPHERAL_BUF_CONFIG fails, with ret val = %d\n", ret);
+	   //  	perror("ioctl DIAG_IOCTL_PERIPHERAL_BUF_CONFIG");
+	   //  }
+    // }
+
+	
+
+	// /*
+	//  * Enable logging mode
+	//  * Reference: https://android.googlesource.com/kernel/msm.git/+/android-6.0.0_r0.9/drivers/char/diag/diagchar_core.c
+	//  */
+	// ret = ioctl(fd, DIAG_IOCTL_SWITCH_LOGGING, (char *) &mode);  
+	// if (ret < 0) {
+	// 	LOGD("ioctl SWITCH_LOGGING fails: %s \n", strerror(errno));
+	// 	perror("ioctl SWITCH_LOGGING");
+	// 	// Yuanjie: the following works for Samsung S5
+	// 	ret = ioctl(fd, DIAG_IOCTL_SWITCH_LOGGING, (char *) mode);
+	// 	if (ret < 0) {
+	// 		LOGD("Alternative ioctl SWITCH_LOGGING fails: %s \n", strerror(errno));
+	// 		perror("Alternative ioctl SWITCH_LOGGING");
+
+	// 		/* Android 7.0 mode
+	// 		 * Reference: https://android.googlesource.com/kernel/msm.git/+/android-7.1.0_r0.3/drivers/char/diag/diagchar_core.c
+	// 		 */
+
+	// 		struct diag_logging_mode_param_t new_mode;
+	// 		new_mode.req_mode = mode;
+	// 		new_mode.peripheral_mask = DIAG_CON_ALL;
+	// 		new_mode.mode_param = 0;
+
+	// 		ret = ioctl(fd, DIAG_IOCTL_SWITCH_LOGGING, (char *)& new_mode);
+	// 		if (ret < 0) {
+	// 			LOGD("Android-7.0 ioctl SWITCH_LOGGING fails: %s \n", strerror(errno));
+	// 			perror("Alternative ioctl SWITCH_LOGGING");
+
+
+	// 			ret = ioctl(fd, DIAG_IOCTL_SWITCH_LOGGING, &mode, 12, 0, 0, 0, 0);
+	// 			if (ret < 0) {
+	// 				LOGD("S7 Edge fails: %s \n", strerror(errno));
+	// 		    }
+	// 		}	
+
+	// 	}
+
+	// }
+	// else{
+	// 	// printf("Older way of ioctl succeeds.\n");
+	// }
+
+    /*
+     * Enable logging mode
+     */
+    ret = -1;
+    if (ret < 0) {
+        // Reference: https://android.googlesource.com/kernel/msm.git/+/android-6.0.0_r0.9/drivers/char/diag/diagchar_core.c
+	    ret = ioctl(fd, DIAG_IOCTL_SWITCH_LOGGING, (char *) &mode);
+    }
+    if (ret < 0) {
+        LOGD("ioctl SWITCH_LOGGING fails: %s \n", strerror(errno));
+        perror("ioctl SWITCH_LOGGING");
+        // Yuanjie: the following works for Samsung S5
+        ret = ioctl(fd, DIAG_IOCTL_SWITCH_LOGGING, (char *) mode);
+    }
+    if (ret < 0) {
+        LOGD("Alternative ioctl SWITCH_LOGGING fails: %s \n", strerror(errno));
+        perror("Alternative ioctl SWITCH_LOGGING");
+        /* Android 7.0 mode
+         * * Reference: https://android.googlesource.com/kernel/msm.git/+/android-7.1.0_r0.3/drivers/char/diag/diagchar_core.c
+         * */
+        struct diag_logging_mode_param_t new_mode;
+        new_mode.req_mode = mode;
+        new_mode.peripheral_mask = DIAG_CON_ALL;
+        new_mode.mode_param = 0;
+        ret = ioctl(fd, DIAG_IOCTL_SWITCH_LOGGING, (char *)& new_mode);
+    }
+    if (ret < 0) {
+        LOGD("Android-7.0 ioctl SWITCH_LOGGING fails: %s \n", strerror(errno));
+        perror("Alternative ioctl SWITCH_LOGGING");
+        // Yuanjie: the following is used for Samsung S7 Edge
+        ret = ioctl(fd, DIAG_IOCTL_SWITCH_LOGGING, &mode, 12, 0, 0, 0, 0);
+    }
+    if (ret < 0) {
+        LOGD("S7 Edge ioctl SWITCH_LOGGING fails: %s \n", strerror(errno));
+        perror("Alternative ioctl SWITCH_LOGGING");
+        // Haotian: try for XiaoMI 6 7.1.1
+        ret = ioctl(fd, DIAG_IOCTL_SWITCH_LOGGING, mode);
+    }
+    if (ret < 0) {
+        LOGD("XiaoMI method 1 ioctl SWITCH_LOGGING fails: %s \n", strerror(errno));
+        perror("Alternative ioctl SWITCH_LOGGING");
+        // Haotian: try for XiaoMI 6 from Yuanjie (32 bits libdiag.so)
+        ret = ioctl(fd, DIAG_IOCTL_SWITCH_LOGGING, mode, 0, 0, 0);
+    }
+    if (ret < 0) {
+        LOGD("XiaoMI method 2 ioctl SWITCH_LOGGING fails: %s \n", strerror(errno));
+        perror("Alternative ioctl SWITCH_LOGGING");
+    }
+
+    if (ret >= 0) {
+        LOGD("Enable logging mode success.\n");
+    } else {
+        LOGD("Failed to enable logging mode.\n");
+    }
+
+	return ret;
 }
 
 /* function to write into device*/
@@ -310,13 +521,13 @@ void *diag_com_listen(void * arg)
 		
 		if(!init_done){
 			d_log("Exiting Read thread ");
-			return ;
+			return NULL;
 		} /*This is existing the thread*/
 		gettimeofday(&enter, NULL);
 		retval = select(globalFD+1 ,&set,NULL ,NULL ,&timeout);
 		if (!init_done) {
 			d_log("Exiting Read thread ");
-			return ;
+			return NULL;
 		} /*This is existing the thread*/
 		if (retval == -1){
 			d_warning("error in select()");
@@ -338,6 +549,8 @@ void *diag_com_listen(void * arg)
 				(exit.tv_usec - enter.tv_usec));
 		}
 	}
+
+	return NULL;
 }
 
 
